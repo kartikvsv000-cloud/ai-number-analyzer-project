@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Number Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090e18;color:#eef2ff;font-family:Arial,sans-serif;padding:16px}
+header{padding:18px 0;border-bottom:1px solid #273247}
+h1{font-size:23px;margin:0 0 8px;color:#60a5fa}
+.sub{color:#94a3b8;font-size:13px}
+.card{background:#121b2b;border:1px solid #26344c;border-radius:14px;padding:17px;margin-top:16px}
+h2{font-size:16px;margin:0 0 15px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:#1b2940;padding:13px;border-radius:10px}
+.stat small{color:#9caec8}
+.stat strong{display:block;font-size:25px;margin-top:7px}
+.numbers{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
+button{cursor:pointer;border:0;border-radius:9px;padding:13px;font-size:16px;font-weight:bold}
+.num{background:#24344d;color:white}
+.num:active{background:#2563eb}
+.action{background:#2563eb;color:white;width:100%;margin-top:12px}
+.danger{background:#7f2938;color:white}
+.secondary{background:#26344c;color:white}
+input[type=file]{width:100%;color:#cbd5e1;margin:8px 0}
+input[type=text]{width:100%;padding:13px;background:#0b1423;border:1px solid #334155;color:white;border-radius:8px}
+.history{display:flex;flex-wrap:wrap;gap:7px}
+.pill{padding:9px 12px;border-radius:8px;background:#26344c;font-size:13px}
+.big{color:#fbbf24}.small{color:#60a5fa}
+.muted{color:#94a3b8;font-size:12px;line-height:1.6}
+.row{display:flex;gap:9px;margin-top:10px}
+.row button{flex:1}
+footer{text-align:center;color:#64748b;font-size:12px;padding:25px 0}
+</style>
+</head>
+<body>
+
+<header>
+<h1>AI Number Analyzer</h1>
+<div class="sub">Number Analysis & Probability Dashboard</div>
+</header>
+
+<section class="card">
+<h2>History Dashboard</h2>
+<div class="stats">
+<div class="stat"><small>Total Results</small><strong id="total">0</strong></div>
+<div class="stat"><small>BIG (5–9)</small><strong id="bigCount">0</strong></div>
+<div class="stat"><small>SMALL (0–4)</small><strong id="smallCount">0</strong></div>
+<div class="stat"><small>Latest Number</small><strong id="latest">-</strong></div>
+</div>
+</section>
+
+<section class="card">
+<h2>Enter Result (0–9)</h2>
+<div class="numbers" id="numberButtons"></div>
+<p class="muted">0–4 = SMALL | 5–9 = BIG. Tap a number to add it to history.</p>
+<div class="row">
+<button class="secondary" onclick="undo()">Undo</button>
+<button class="danger" onclick="clearHistory()">Clear All</button>
+</div>
+</section>
+
+<section class="card">
+<h2>Import CSV / Excel</h2>
+<input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+<button class="action" onclick="importFile()">Import Data</button>
+<p class="muted">File mein numbers 0–9 hone chahiye. CSV ya Excel ki first column se numbers read honge.</p>
+<button class="secondary" style="width:100%" onclick="exportCSV()">Export History as CSV</button>
+</section>
+
+<section class="card">
+<h2>Number Frequency</h2>
+<div id="frequency"></div>
+</section>
+
+<section class="card">
+<h2>Result History</h2>
+<div class="history" id="history"></div>
+<p class="muted" id="empty">Abhi koi result add nahi hua hai.</p>
+</section>
+
+<section class="card">
+<h2>System Information</h2>
+<p class="muted">Version 1.0 – Foundation</p>
+<p class="muted">Current version historical data save aur analyze karta hai. AI prediction modules agle development stages mein add honge. Historical frequency future result ki guarantee nahi hai.</p>
+</section>
+
+<footer>AI Number Analyzer | Personal Data Analysis Project</footer>
+
+<script>
+const KEY="aina_history";
+let data=[];
+try{data=JSON.parse(localStorage.getItem(KEY)||"[]")}
+catch(e){data=[]}
+if(!Array.isArray(data))data=[];
+
+function save(){
+localStorage.setItem(KEY,JSON.stringify(data));
+render();
+}
+
+function addNumber(n){
+data.push(Number(n));
+save();
+}
+
+function undo(){
+if(data.length){data.pop();save();}
+}
+
+function clearHistory(){
+if(confirm("Delete all saved results?")){
+data=[];
+save();
+}
+}
+
+function render(){
+const big=data.filter(n=>n>=5).length;
+const small=data.length-big;
+document.getElementById("total").textContent=data.length;
+document.getElementById("bigCount").textContent=big;
+document.getElementById("smallCount").textContent=small;
+document.getElementById("latest").textContent=data.length?data[data.length-1]:"-";
+
+const hist=document.getElementById("history");
+hist.innerHTML=data.slice().reverse().map((n,i)=>
+`<span class="pill ${n>=5?"big":"small"}">${n} · ${n>=5?"BIG":"SMALL"}</span>`
+).join("");
+document.getElementById("empty").style.display=data.length?"none":"block";
+
+let html="";
+for(let n=0;n<=9;n++){
+const count=data.filter(x=>x===n).length;
+const pct=data.length?(count/data.length*100).toFixed(1):0;
+html+=`<p class="muted">${n} — ${count} times (${pct}%)</p>`;
+}
+document.getElementById("frequency").innerHTML=html;
+}
+
+function importFile(){
+const file=document.getElementById("fileInput").files[0];
+if(!file){alert("Please select a CSV or Excel file.");return;}
+const reader=new FileReader();
+reader.onload=e=>{
+try{
+let rows=[];
+if(file.name.match(/\.xlsx?$/i)){
+if(!window.XLSX)throw new Error("Excel library load nahi hui. Internet check karo.");
+const book=XLSX.read(e.target.result,{type:"array"});
+rows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{header:1});
+}else{
+rows=e.target.result.split(/\r?\n/).map(line=>line.split(","));
+}
+const nums=rows.map(row=>Number(String(row[0]??"").trim()))
+.filter(n=>Number.isInteger(n)&&n>=0&&n<=9);
+if(!nums.length){alert("First column mein valid numbers 0–9 nahi mile.");return;}
+data.push(...nums);
+save();
+alert(nums.length+" results imported successfully.");
+}catch(err){alert("Import error: "+err.message);}
+};
+if(file.name.match(/\.xlsx?$/i))reader.readAsArrayBuffer(file);
+else reader.readAsText(file);
+}
+
+function exportCSV(){
+if(!data.length){alert("History is empty.");return;}
+const csv="Number\n"+data.join("\n");
+const blob=new Blob([csv],{type:"text/csv"});
+const url=URL.createObjectURL(blob);
+const a=document.createElement("a");
+a.href=url;a.download="number-history.csv";a.click();
+URL.revokeObjectURL(url);
+}
+
+const buttons=document.getElementById("numberButtons");
+for(let n=0;n<=9;n++){
+const b=document.createElement("button");
+b.className="num";b.textContent=n;
+b.onclick=()=>addNumber(n);
+buttons.appendChild(b);
+}
+render();
+</script>
+</body>
+</html>
